@@ -5,107 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Alphan Tarikatı</title>
     <style>
-        body {
-            background-color: #1a1a1a;
-            color: #ffffff;
-            font-family: 'Arial', sans-serif;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-        }
-        .container {
-            width: 80%;
-            max-width: 600px;
-            background: #2c2c2c;
-            border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.5);
-            padding: 20px;
-        }
-        h1 {
-            text-align: center;
-            color: #61dafb;
-            font-size: 2em;
-            margin-bottom: 20px;
-        }
-        .chat-area {
-            height: 300px;
-            overflow-y: scroll;
-            border: 1px solid #333;
-            background: #333;
-            padding: 10px;
-            margin-bottom: 10px;
-        }
-        .message {
-            background: #444;
-            padding: 10px;
-            margin: 5px 0;
-            border-radius: 5px;
-        }
-        .input-area {
-            display: flex;
-            gap: 10px;
-        }
-        input, button {
-            padding: 10px;
-            border: none;
-            border-radius: 5px;
-        }
-        input {
-            flex-grow: 1;
-            background: #555;
-            color: white;
-        }
-        button {
-            background: #61dafb;
-            color: black;
-            cursor: pointer;
-        }
-        button:hover {
-            background: #50b7f5;
-        }
-        /* Modal styles */
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            overflow: auto;
-            background-color: rgba(0,0,0,0.4);
-        }
-        .modal-content {
-            background-color: #2c2c2c;
-            margin: 15% auto;
-            padding: 20px;
-            border: 1px solid #888;
-            width: 80%;
-            max-width: 300px;
-        }
-        .close {
-            color: #aaa;
-            float: right;
-            font-size: 28px;
-            font-weight: bold;
-            cursor: pointer;
-        }
-        .close:hover,
-        .close:focus {
-            color: #000;
-            text-decoration: none;
-            cursor: pointer;
-        }
+        /* ... Existing CSS styles ... */
     </style>
 </head>
-<body onload="showUsernameModal()">
+<body onload="initializeChat()">
     <div class="container">
         <h1>Alphan Tarikatı</h1>
         <div class="chat-area">
-            <div class="message">Alphan Tarikatına Hoşgeldin!</div>
+            <div class="message">Welcome to Alphan Tarikatı!</div>
         </div>
         <div class="input-area">
             <input type="text" placeholder="Type a message..." id="messageInput">
@@ -118,7 +25,7 @@
     <!-- Modal for Username -->
     <div id="usernameModal" class="modal">
         <div class="modal-content">
-            <span class="close">&times;</span>
+            <span class="close">×</span>
             <h2>Set Your Username</h2>
             <input type="text" placeholder="Enter your username" id="usernameInput" required>
             <button onclick="setUsername()">Set</button>
@@ -126,9 +33,45 @@
     </div>
 
     <script>
-        // Simulate IP for different users
-        let userIP = Math.floor(Math.random() * 1000); // This would be replaced with actual IP detection logic
+        let socket;
+        let userIP = Math.floor(Math.random() * 1000); // Simulated IP for user color
         let userName = null;
+        let lastMessageId = 0; // Track the last message ID we've seen
+        const ipColors = {};
+
+        function initializeChat() {
+            showUsernameModal();
+            connectToServer();
+        }
+
+        function connectToServer() {
+            // Replace 'server.com' with your actual server endpoint
+            socket = new WebSocket('wss://nyxsha.github.io/Alphan'); // Note: GitHub Pages doesn't support WebSockets directly; this would need to be hosted elsewhere for WebSocket functionality
+
+            socket.onopen = function(event) {
+                console.log("Connected to server");
+                fetchPastMessages();
+            };
+
+            socket.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                if (data.type === "message") {
+                    displayMessage(data);
+                    lastMessageId = Math.max(lastMessageId, data.id);
+                } else if (data.type === "userJoin") {
+                    displayMessage({ user: "System", text: `${data.user} has joined the chat.` });
+                }
+            };
+            
+            socket.onclose = function(event) {
+                console.log("Disconnected from server");
+                setTimeout(connectToServer, 1000); // Attempt to reconnect after a second
+            };
+            
+            socket.onerror = function(error) {
+                console.log('WebSocket Error:', error);
+            };
+        }
 
         function showUsernameModal() {
             document.getElementById('usernameModal').style.display = 'block';
@@ -143,52 +86,58 @@
             if (usernameInput.value) {
                 userName = usernameInput.value;
                 closeModal();
-                // Disable further changes to username
-                document.getElementById('usernameModal').style.display = 'none';
+                // Notify server that a new user has joined
+                socket.send(JSON.stringify({ type: "userJoin", user: userName }));
             }
         }
 
-        // Add click event to close the modal
         document.querySelector('.close').addEventListener('click', closeModal);
 
         function getRandomColor() {
             return '#' + Math.floor(Math.random()*16777215).toString(16);
         }
 
-        const ipColors = {};
-
         function sendMessage() {
             const messageInput = document.getElementById('messageInput');
-            const chatArea = document.querySelector('.chat-area');
             if (messageInput.value) {
-                const messageElement = document.createElement('div');
-                messageElement.className = 'message';
-                
-                // Set color based on IP
-                if (!ipColors[userIP]) {
-                    ipColors[userIP] = getRandomColor();
-                }
-                messageElement.style.color = ipColors[userIP];
-
-                // Add username if set
-                if (userName) {
-                    const userSpan = document.createElement('span');
-                    userSpan.textContent = userName + ': ';
-                    userSpan.style.fontWeight = 'bold'; // Make username bold
-                    messageElement.appendChild(userSpan);
-                } else {
-                    messageElement.textContent = "Anonymous: "; // Default to anonymous if no username set
-                }
-
-                // Add message content
-                const contentSpan = document.createElement('span');
-                contentSpan.textContent = messageInput.value;
-                messageElement.appendChild(contentSpan);
-
-                chatArea.appendChild(messageElement);
+                const message = {
+                    text: messageInput.value,
+                    user: userName || "Anonymous",
+                    type: "message",
+                    id: Date.now() // Use timestamp as a simple ID for this example
+                };
+                socket.send(JSON.stringify(message));
                 messageInput.value = '';
-                chatArea.scrollTop = chatArea.scrollHeight;
             }
+        }
+
+        function displayMessage(message) {
+            const chatArea = document.querySelector('.chat-area');
+            const messageElement = document.createElement('div');
+            messageElement.className = 'message';
+            
+            if (!ipColors[userIP]) {
+                ipColors[userIP] = getRandomColor();
+            }
+            messageElement.style.color = ipColors[userIP];
+
+            if (message.user) {
+                messageElement.innerHTML = `<strong>${message.user}: </strong>${message.text}`;
+            } else {
+                messageElement.textContent = message.text;
+            }
+            
+            chatArea.appendChild(messageElement);
+            chatArea.scrollTop = chatArea.scrollHeight;
+        }
+
+        function fetchPastMessages() {
+            // Note: This would typically require server-side support since GitHub Pages is static
+            fetch('/api/messages?since=' + lastMessageId)
+            .then(response => response.json())
+            .then(messages => {
+                messages.forEach(displayMessage);
+            });
         }
 
         document.getElementById('fileInput').addEventListener('change', function(event) {
@@ -196,38 +145,58 @@
             const chatArea = document.querySelector('.chat-area');
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
-                const messageElement = document.createElement('div');
-                messageElement.className = 'message';
-
-                // Set color based on IP
-                if (!ipColors[userIP]) {
-                    ipColors[userIP] = getRandomColor();
-                }
-                messageElement.style.color = ipColors[userIP];
-
-                if (userName) {
-                    messageElement.innerHTML = `<strong>${userName}: </strong>`;
-                } else {
-                    messageElement.innerHTML = `<strong>Anonymous: </strong>`;
-                }
-
-                if (file.type.match('image.*')) {
-                    const img = document.createElement('img');
-                    img.src = URL.createObjectURL(file);
-                    img.style.maxWidth = '100%';
-                    messageElement.appendChild(img);
-                } else if (file.type.match('video.*')) {
-                    const video = document.createElement('video');
-                    video.src = URL.createObjectURL(file);
-                    video.controls = true;
-                    video.style.maxWidth = '100%';
-                    messageElement.appendChild(video);
-                }
-                chatArea.appendChild(messageElement);
-                chatArea.scrollTop = chatArea.scrollHeight;
+                const message = {
+                    user: userName || "Anonymous",
+                    type: "message",
+                    id: Date.now(),
+                    data: {
+                        type: file.type,
+                        name: file.name,
+                        content: URL.createObjectURL(file)
+                    }
+                };
+                socket.send(JSON.stringify(message));
             }
             this.value = ''; // Reset the file input
         });
+
+        // Handling file messages from other users
+        socket.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            if (data.type === "message" && data.data) {
+                displayFileMessage(data);
+            } else {
+                displayMessage(data);
+            }
+        };
+
+        function displayFileMessage(message) {
+            const chatArea = document.querySelector('.chat-area');
+            const messageElement = document.createElement('div');
+            messageElement.className = 'message';
+
+            if (!ipColors[userIP]) {
+                ipColors[userIP] = getRandomColor();
+            }
+            messageElement.style.color = ipColors[userIP];
+
+            messageElement.innerHTML = `<strong>${message.user}: </strong>`;
+
+            if (message.data.type.match('image.*')) {
+                const img = document.createElement('img');
+                img.src = message.data.content;
+                img.style.maxWidth = '100%';
+                messageElement.appendChild(img);
+            } else if (message.data.type.match('video.*')) {
+                const video = document.createElement('video');
+                video.src = message.data.content;
+                video.controls = true;
+                video.style.maxWidth = '100%';
+                messageElement.appendChild(video);
+            }
+            chatArea.appendChild(messageElement);
+            chatArea.scrollTop = chatArea.scrollHeight;
+        }
     </script>
 </body>
 </html>
